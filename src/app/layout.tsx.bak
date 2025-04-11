@@ -1,0 +1,47 @@
+﻿'use client';
+
+import { Inter, JetBrains_Mono } from 'next/font/google';
+import { ThemeProvider } from "@/context/theme-context";
+import { AuthProvider } from "@/context/auth-context";
+import React, { Suspense } from 'react';
+import './globals.css';
+
+// Definition des polices
+const inter = Inter({
+  subsets: ['latin'],
+  variable: '--font-inter',
+  display: 'swap',
+  preload: true,
+});
+
+const jetbrainsMono = JetBrains_Mono({
+  subsets: ['latin'],
+  variable: '--font-jetbrains-mono',
+  display: 'swap',
+  preload: true,
+});
+
+// Fallback pour le chargement
+const LoadingFallback = () => (
+  <div className="h-screen w-full flex items-center justify-center">
+    <div className="nofile-spinner"></div>
+  </div>
+);
+
+export default function RootLayout(props: { children: React.ReactNode }) {
+  const children = props.children;
+
+  return (
+    <html lang="fr" suppressHydrationWarning>
+      <body className="font-sans antialiased">
+        <Suspense fallback={<LoadingFallback />}>
+          <AuthProvider>
+            <ThemeProvider>
+              {children}
+            </ThemeProvider>
+          </AuthProvider>
+        </Suspense>
+      </body>
+    </html>
+  );
+}
