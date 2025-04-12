@@ -13,7 +13,7 @@ interface QueueInfoCardProps {
 }
 
 export function QueueInfoCard({ queue, waitingClients }: QueueInfoCardProps) {
-    // Calculer le temps d'attente moyen en minutes
+    // Temps moyen de service par client (valeur dynamique basée sur les clients servis)
     const averageWaitTime = queue.averageServiceTime || 5;
 
     // Calculer le temps d'attente estimé pour toute la file

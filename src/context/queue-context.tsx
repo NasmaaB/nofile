@@ -413,6 +413,12 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
             const queueRef = doc(db, 'queues', id);
 
+            // Vérifier si averageServiceTime est mis à jour
+            if (data.averageServiceTime !== undefined) {
+                // Mettre à jour les temps d'attente estimés des clients
+                await updateWaitingClientsEstimatedTime(id, data.averageServiceTime);
+            }
+
             await updateDoc(queueRef, {
                 ...data,
                 updatedAt: serverTimestamp()
@@ -692,9 +698,20 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             const snapshot = await getDocs(q);
             const batch: Promise<void>[] = [];
 
+            // Récupérer le temps moyen de service actuel
+            const queueRef = doc(db, 'queues', client.queueId);
+            const queueSnap = await getDoc(queueRef);
+            const averageServiceTime = queueSnap.exists() ?
+                (queueSnap.data().averageServiceTime || 5) : 5;
+
             snapshot.forEach((doc) => {
+                const clientData = doc.data();
+                const newPosition = (clientData.position as number) - 1;
+
+                // Mettre à jour la position et le temps d'attente estimé
                 batch.push(updateDoc(doc.ref, {
-                    position: increment(-1)
+                    position: increment(-1),
+                    estimatedWaitTime: newPosition * averageServiceTime
                 }));
             });
 
@@ -745,9 +762,20 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 const snapshot = await getDocs(q);
                 const batch: Promise<void>[] = [];
 
+                // Récupérer le temps moyen de service actuel
+                const queueRef = doc(db, 'queues', client.queueId);
+                const queueSnap = await getDoc(queueRef);
+                const averageServiceTime = queueSnap.exists() ?
+                    (queueSnap.data().averageServiceTime || 5) : 5;
+
                 snapshot.forEach((doc) => {
+                    const clientData = doc.data();
+                    const newPosition = (clientData.position as number) - 1;
+
+                    // Mettre à jour la position et le temps d'attente estimé
                     batch.push(updateDoc(doc.ref, {
-                        position: increment(-1)
+                        position: increment(-1),
+                        estimatedWaitTime: newPosition * averageServiceTime
                     }));
                 });
 
@@ -823,13 +851,65 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
             const stats = calculateQueueStats(servedClients);
 
-            await updateDoc(doc(db, 'queues', queueId), {
+            // Utiliser le temps d'attente moyen comme nouvelle valeur pour averageServiceTime
+            // mais seulement si on a au moins quelques clients servis pour avoir une valeur fiable
+            const newAverageServiceTime = stats.totalServed >= 3 ?
+                Math.max(1, stats.avgWaitTime) : // Minimum 1 minute
+                undefined; // Undefined pour ne pas mettre à jour si pas assez de données
+
+            // Préparer les données à mettre à jour
+            const updateData: any = {
                 'stats.avgWaitTime': stats.avgWaitTime,
                 'stats.maxWaitTime': stats.maxWaitTime,
                 'stats.totalServed': stats.totalServed
-            });
+            };
+
+            // Ajouter averageServiceTime seulement si on a calculé une nouvelle valeur
+            if (newAverageServiceTime) {
+                updateData.averageServiceTime = newAverageServiceTime;
+
+                // Si le temps moyen de service a changé, mettre à jour le temps d'attente estimé de tous les clients en attente
+                await updateWaitingClientsEstimatedTime(queueId, newAverageServiceTime);
+            }
+
+            await updateDoc(doc(db, 'queues', queueId), updateData);
         } catch (err) {
             console.error('Erreur lors de la mise à jour des statistiques:', err);
+        }
+    };
+
+    // Mettre à jour le temps d'attente estimé pour tous les clients en attente
+    const updateWaitingClientsEstimatedTime = async (queueId: string, averageServiceTime: number): Promise<void> => {
+        try {
+            // Récupérer tous les clients en attente pour cette file
+            const clientsRef = collection(db, 'clients');
+            const q = query(
+                clientsRef,
+                where('queueId', '==', queueId),
+                where('status', '==', 'waiting'),
+                orderBy('position', 'asc')
+            );
+
+            const snapshot = await getDocs(q);
+            const batch: Promise<void>[] = [];
+
+            snapshot.forEach((doc) => {
+                const client = doc.data();
+                // Calculer le nouveau temps d'attente estimé
+                const newEstimatedTime = client.position * averageServiceTime;
+
+                batch.push(updateDoc(doc.ref, {
+                    estimatedWaitTime: newEstimatedTime
+                }));
+            });
+
+            // Exécuter toutes les mises à jour en parallèle
+            if (batch.length > 0) {
+                await Promise.all(batch);
+                console.log(`Temps d'attente mis à jour pour ${batch.length} clients`);
+            }
+        } catch (err) {
+            console.error('Erreur lors de la mise à jour des temps d\'attente estimés:', err);
         }
     };
 
@@ -894,9 +974,20 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
                 const snapshot = await getDocs(clientsAfterQuery);
                 const batch: Promise<void>[] = [];
 
+                // Récupérer le temps moyen de service actuel
+                const queueRef = doc(db, 'queues', currentQueue.id);
+                const queueSnap = await getDoc(queueRef);
+                const averageServiceTime = queueSnap.exists() ?
+                    (queueSnap.data().averageServiceTime || 5) : 5;
+
                 snapshot.forEach((doc) => {
+                    const clientData = doc.data();
+                    const newPosition = (clientData.position as number) - 1;
+
+                    // Mettre à jour la position et le temps d'attente estimé
                     batch.push(updateDoc(doc.ref, {
-                        position: increment(-1)
+                        position: increment(-1),
+                        estimatedWaitTime: newPosition * averageServiceTime
                     }));
                 });
 

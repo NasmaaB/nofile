@@ -163,8 +163,18 @@ export function JoinQueueForm({
             [name]: type === 'checkbox' ? checked : value,
         }));
 
-        // Vérifier les doublons pour les champs concernés
-        if (name === 'name' || name === 'phone' || name === 'email') {
+        // Réinitialiser les erreurs de doublons lorsque l'utilisateur modifie le champ
+        if (duplicateCheck.field === name && duplicateCheck.found) {
+            setDuplicateCheck({
+                checking: false,
+                found: false,
+                field: null,
+                value: null
+            });
+        }
+
+        // Vérifier les doublons uniquement pour le téléphone et l'email pendant la saisie
+        if ((name === 'phone' || name === 'email') && value.length >= 3) {
             checkForDuplicates(name, value);
         }
 
@@ -180,24 +190,51 @@ export function JoinQueueForm({
 
     // Vérifier les doublons
     const checkForDuplicates = (field: string, value: string) => {
-        if (!value || value.length < 3) return;
+        if (!value || value.length < 3) {
+            // Réinitialiser l'état si la valeur est trop courte
+            if (duplicateCheck.field === field) {
+                setDuplicateCheck({
+                    checking: false,
+                    found: false,
+                    field: null,
+                    value: null
+                });
+            }
+            return;
+        }
+
+        // Vérifications de doublons uniquement pour téléphone et email pendant la saisie
+        if (field === 'name') return;
 
         setDuplicateCheck((prev) => ({ ...prev, checking: true, field, value }));
 
         // Temporisation pour éviter trop de vérifications pendant la saisie
         setTimeout(() => {
-            const foundDuplicate = waitingClients.some((client) => {
-                if (field === 'name' && client.name.toLowerCase() === value.toLowerCase()) {
-                    return true;
+            let foundDuplicate = false;
+
+            if (field === 'phone') {
+                // Normaliser le téléphone pour la comparaison
+                const normalizedPhone = normalizePhoneNumber(value);
+
+                // Vérification explicite
+                for (const client of waitingClients) {
+                    if (normalizePhoneNumber(client.phone) === normalizedPhone && normalizedPhone !== '') {
+                        foundDuplicate = true;
+                        break;
+                    }
                 }
-                if (field === 'phone' && client.phone === value) {
-                    return true;
+            } else if (field === 'email') {
+                // Normaliser l'email pour la comparaison
+                const normalizedEmail = value.toLowerCase().trim();
+
+                // Vérification explicite
+                for (const client of waitingClients) {
+                    if (client.email.toLowerCase().trim() === normalizedEmail && normalizedEmail !== '') {
+                        foundDuplicate = true;
+                        break;
+                    }
                 }
-                if (field === 'email' && client.email.toLowerCase() === value.toLowerCase()) {
-                    return true;
-                }
-                return false;
-            });
+            }
 
             setDuplicateCheck({
                 checking: false,
@@ -213,7 +250,9 @@ export function JoinQueueForm({
         const formErrors: { name?: string; phone?: string; email?: string } = {};
 
         // Validation du nom (toujours obligatoire)
-        if (!formData.name || formData.name.length < 3) {
+        if (!formData.name || formData.name.trim() === '') {
+            formErrors.name = 'Le nom est requis';
+        } else if (formData.name.length < 3) {
             formErrors.name = 'Le nom doit contenir au moins 3 caractères';
         } else if (formData.name.length > 50) {
             formErrors.name = 'Le nom ne peut pas dépasser 50 caractères';
@@ -221,40 +260,44 @@ export function JoinQueueForm({
 
         // Au moins une méthode de notification doit être activée
         if (!formData.smsNotifications && !formData.emailNotifications) {
-            formErrors.name = 'Vous devez choisir au moins une méthode de notification (SMS ou Email)';
+            formErrors.name = formErrors.name || 'Vous devez choisir au moins une méthode de notification (SMS ou Email)';
+            setErrors(formErrors);
             return false;
         }
 
         // Validation du téléphone uniquement si notifications SMS activées
         if (formData.smsNotifications) {
-            const phoneWithoutSpaces = formData.phone.replace(/\s/g, '');
-            const digitsOnly = phoneWithoutSpaces.replace(/\D/g, '');
-
-            if (!formData.phone) {
+            if (!formData.phone || formData.phone.trim() === '') {
                 formErrors.phone = 'Le numéro de téléphone est requis pour les notifications SMS';
-            } else if (phoneWithoutSpaces.startsWith('0') && digitsOnly.length !== 10) {
-                formErrors.phone = 'Le numéro doit contenir exactement 10 chiffres';
-            } else if (phoneWithoutSpaces.startsWith('+33') && digitsOnly.length !== 11) {
-                // +33 + 9 chiffres = 11
-                formErrors.phone = 'Le numéro avec +33 doit contenir exactement 11 chiffres';
-            } else if (!phoneWithoutSpaces.startsWith('0') && !phoneWithoutSpaces.startsWith('+')) {
-                formErrors.phone = 'Le numéro doit commencer par 0 ou +33';
-            } else if (!/^[0-9+\s()-]+$/.test(formData.phone)) {
-                formErrors.phone = 'Le format du numéro de téléphone est invalide';
+            } else {
+                const phoneWithoutSpaces = formData.phone.replace(/\s/g, '');
+                const digitsOnly = phoneWithoutSpaces.replace(/\D/g, '');
+
+                if (phoneWithoutSpaces.startsWith('0') && digitsOnly.length !== 10) {
+                    formErrors.phone = 'Le numéro doit contenir exactement 10 chiffres';
+                } else if (phoneWithoutSpaces.startsWith('+33') && digitsOnly.length !== 9) {
+                    formErrors.phone = 'Le numéro avec +33 doit contenir exactement 9 chiffres';
+                } else if (!phoneWithoutSpaces.startsWith('0') && !phoneWithoutSpaces.startsWith('+')) {
+                    formErrors.phone = 'Le numéro doit commencer par 0 ou +33';
+                } else if (!/^[0-9+\s()-]+$/.test(formData.phone)) {
+                    formErrors.phone = 'Le format du numéro de téléphone est invalide';
+                }
             }
         }
 
         // Validation de l'email uniquement si notifications email activées
         if (formData.emailNotifications) {
-            const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-            if (!formData.email) {
+            if (!formData.email || formData.email.trim() === '') {
                 formErrors.email = "L'email est requis pour les notifications email";
-            } else if (!emailRegex.test(formData.email)) {
-                formErrors.email = "L'email est invalide";
-            } else if (formData.email.length < 5) {
-                formErrors.email = "L'email doit contenir au moins 5 caractères";
-            } else if (formData.email.length > 100) {
-                formErrors.email = "L'email ne peut pas dépasser 100 caractères";
+            } else {
+                const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+                if (!emailRegex.test(formData.email)) {
+                    formErrors.email = "L'email est invalide";
+                } else if (formData.email.length < 5) {
+                    formErrors.email = "L'email doit contenir au moins 5 caractères";
+                } else if (formData.email.length > 100) {
+                    formErrors.email = "L'email ne peut pas dépasser 100 caractères";
+                }
             }
         }
 
@@ -265,10 +308,12 @@ export function JoinQueueForm({
     // Helper pour normaliser le numéro de téléphone avant soumission
     const normalizePhoneNumber = (phone: string): string => {
         // Si le numéro est vide, retourner une chaîne vide
-        if (!phone) return '';
+        if (!phone || phone.trim() === '') return '';
 
         // Enlever tous les caractères non numériques
         const digitsOnly = phone.replace(/\D/g, '');
+
+        if (digitsOnly === '') return '';
 
         // Format national français (commence par 0)
         if (digitsOnly.startsWith('0')) {
@@ -289,9 +334,17 @@ export function JoinQueueForm({
         return '+33' + digitsOnly;
     };
 
-    // Soumission du formulaire
+    // Version modifiée de la fonction handleSubmit avec plus de logging et de vérifications
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Avant toute chose, réinitialiser l'état des doublons
+        setDuplicateCheck({
+            checking: false,
+            found: false,
+            field: null,
+            value: null,
+        });
 
         // Validation du formulaire avant soumission
         if (!validateForm()) {
@@ -299,52 +352,105 @@ export function JoinQueueForm({
         }
 
         try {
-            // Désactive les erreurs de doublons précédentes
+            // Variables pour stocker les valeurs normalisées
+            const normalizedName = formData.name.toLowerCase().trim();
+            let normalizedPhone = '';
+            let normalizedEmail = '';
+            let isDuplicate = false;
+
+            // Préparer les valeurs normalisées qui seront utilisées pour la détection de doublons et la soumission
+            if (formData.smsNotifications && formData.phone) {
+                normalizedPhone = normalizePhoneNumber(formData.phone);
+            }
+
+            if (formData.emailNotifications && formData.email) {
+                normalizedEmail = formData.email.toLowerCase().trim();
+            }
+
+            // Vérification du nom (toujours requise)
+            // Important: Utilisez une comparaison stricte pour les chaînes
+            for (const client of waitingClients) {
+                if (client.name.toLowerCase().trim() === normalizedName) {
+                    console.log("Doublon de nom trouvé:", client.name, "vs", normalizedName);
+                    setDuplicateCheck({
+                        checking: false,
+                        found: true,
+                        field: 'name',
+                        value: formData.name,
+                    });
+                    isDuplicate = true;
+                    return; // Arrêter immédiatement si doublon trouvé
+                }
+            }
+
+            // Vérification du téléphone uniquement si SMS activés
+            if (!isDuplicate && formData.smsNotifications && normalizedPhone) {
+                for (const client of waitingClients) {
+                    const clientPhone = normalizePhoneNumber(client.phone);
+                    if (clientPhone === normalizedPhone && normalizedPhone !== '') {
+                        setDuplicateCheck({
+                            checking: false,
+                            found: true,
+                            field: 'phone',
+                            value: formData.phone,
+                        });
+                        isDuplicate = true;
+                        return; // Arrêter immédiatement si doublon trouvé
+                    }
+                }
+            }
+
+            // Vérification de l'email uniquement si Email activé
+            if (!isDuplicate && formData.emailNotifications && normalizedEmail) {
+                for (const client of waitingClients) {
+                    const clientEmail = client.email.toLowerCase().trim();
+                    if (clientEmail === normalizedEmail && normalizedEmail !== '') {
+                        setDuplicateCheck({
+                            checking: false,
+                            found: true,
+                            field: 'email',
+                            value: formData.email,
+                        });
+                        isDuplicate = true;
+                        return; // Arrêter immédiatement si doublon trouvé
+                    }
+                }
+            }
+
+            // Si nous arrivons ici, c'est qu'aucun doublon n'a été trouvé
+            // Préparation des données pour soumission
+            const submissionData = {
+                name: formData.name.trim(),
+                phone: normalizedPhone,
+                email: normalizedEmail,
+                smsNotifications: formData.smsNotifications,
+                emailNotifications: formData.emailNotifications
+            };
+
+            // Soumission du formulaire
+            const result = await onSubmit(submissionData);
+
+            // Gestion du cas où le backend trouve un doublon que nous n'avons pas détecté
+            if (!result.success && result.duplicateFound) {
+                setDuplicateCheck({
+                    checking: false,
+                    found: true,
+                    field: 'name', // Par défaut, on suppose un doublon de nom
+                    value: formData.name,
+                });
+            }
+
+            // Si tout s'est bien passé, on peut réinitialiser le formulaire ici si nécessaire
+
+        } catch (error) {
+            console.error("Erreur lors de la soumission du formulaire:", error);
+            // Réinitialiser l'état des doublons en cas d'erreur
             setDuplicateCheck({
                 checking: false,
                 found: false,
                 field: null,
                 value: null,
             });
-
-            // Préparer les données normalisées
-            let normalizedPhone = '';
-            let email = '';
-
-            // Si les notifications SMS sont activées, formater le numéro
-            if (formData.smsNotifications && formData.phone) {
-                normalizedPhone = normalizePhoneNumber(formData.phone);
-            }
-
-            // Si les notifications email sont activées, inclure l'email
-            if (formData.emailNotifications && formData.email) {
-                email = formData.email.trim();
-            }
-
-            // Normaliser les données du formulaire
-            const normalizedFormData = {
-                name: formData.name.trim(),
-                email: email,
-                phone: normalizedPhone,
-                smsNotifications: formData.smsNotifications,
-                emailNotifications: formData.emailNotifications
-            };
-
-            // Appel de la fonction onSubmit reçue en props
-            const result = await onSubmit(normalizedFormData);
-
-            // Gestion de la réponse
-            if (!result.success && result.duplicateFound) {
-                // Afficher un message d'erreur de doublon
-                setDuplicateCheck({
-                    checking: false,
-                    found: true,
-                    field: 'name', // Par défaut, on suppose que c'est un doublon de nom
-                    value: formData.name,
-                });
-            }
-        } catch (error) {
-            console.error("Erreur lors de la soumission du formulaire:", error);
         }
     };
 
@@ -443,7 +549,7 @@ export function JoinQueueForm({
                                     {duplicateCheck.field === 'name' && duplicateCheck.found && (
                                         <div className="p-1.5 rounded-md text-xs text-nofile-accent-500 flex items-start">
                                             <AlertCircle className="h-3 w-3 mr-1 mt-0.5 flex-shrink-0" />
-                                            <p>Nom déjà dans la file d'attente</p>
+                                            <p>Ce nom exact est déjà présent dans la file d'attente</p>
                                         </div>
                                     )}
                                     {errors.name && (
@@ -536,7 +642,7 @@ export function JoinQueueForm({
                                             />
                                         </div>
                                         <div id="phone-tip" className="text-[10px] text-gray-500 mt-1 ml-1">
-                                            Format: 06 XX XX XX XX (exactement 10 chiffres)
+                                            Format: 06 XX XX XX XX ou +33 6 XX XX XX XX
                                         </div>
                                         {duplicateCheck.field === 'phone' && duplicateCheck.found && (
                                             <div className="p-1.5 rounded-md text-xs text-nofile-accent-500 flex items-start">
@@ -596,7 +702,7 @@ export function JoinQueueForm({
                                         className={cn(
                                             "w-full gap-2 h-9 text-sm font-medium rounded-md flex items-center justify-center",
                                             isSubmitting || duplicateCheck.found || duplicateCheck.checking || queueIsFull
-                                                ? "bg-gray-400 dark:bg-gray-700 cursor-not-allowed"
+                                                ? "bg-gray-400 dark:bg-gray-700 cursor-not-allowed text-white"
                                                 : "bg-gradient-to-r from-nofile-500 to-nofile-600 hover:from-nofile-600 hover:to-nofile-700 text-white"
                                         )}
                                         disabled={

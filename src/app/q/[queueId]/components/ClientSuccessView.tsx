@@ -84,6 +84,33 @@ export function ClientSuccessView({ client, position, onReset, queue, waitingCli
         return () => clearInterval(interval);
     }, []);
 
+    // Ajouter les styles d'animation au début du composant
+    useEffect(() => {
+        // Ajouter les styles d'animation si nécessaire
+        const style = document.createElement('style');
+        style.innerHTML = `
+            @keyframes fadeInOut {
+                0% { opacity: 0; transform: translateY(-20px); }
+                10% { opacity: 1; transform: translateY(0); }
+                90% { opacity: 1; transform: translateY(0); }
+                100% { opacity: 0; transform: translateY(-20px); }
+            }
+            .animate-fade-in-out {
+                animation: fadeInOut 3s ease-in-out;
+            }
+            .animate-fade-out {
+                opacity: 0;
+                transform: translateY(-20px);
+                transition: all 0.5s ease-out;
+            }
+        `;
+        document.head.appendChild(style);
+
+        return () => {
+            document.head.removeChild(style);
+        };
+    }, []);
+
     // Fonction de désinscription : supprime le client et met à jour la file
     const handleDeregister = async () => {
         if (!clientState?.id) return;
@@ -150,6 +177,7 @@ export function ClientSuccessView({ client, position, onReset, queue, waitingCli
                 html: `
           <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto; padding: 20px; border-radius: 8px; border: 1px solid #e2e8f0;">
             <div style="text-align: center; margin-bottom: 20px;">
+              <img src="${process.env.NEXT_PUBLIC_APP_URL}/logo_nofile.svg" alt="NoFile Logo" style="width: 64px; height: 64px; margin-bottom: 16px;"/>
               <h1 style="color: #0f172a; font-size: 24px; margin-bottom: 8px;">Votre ticket pour ${queue.name}</h1>
               <p style="color: #64748b; font-size: 16px;">Conservez ces informations pour suivre votre position</p>
             </div>
@@ -163,7 +191,7 @@ export function ClientSuccessView({ client, position, onReset, queue, waitingCli
                   <p style="color: #0f172a; font-size: 18px; font-weight: bold; margin: 0;">${clientState.position}</p>
                 </div>
                 <div style="text-align: center; flex: 1;">
-                  <p style="color: #64748b; font-size: 14px; margin-bottom: 4px;">Attente estimée</p>
+                  <p style="color: #64748b; font-size: 14px; margin-bottom: 4px;"> Attente estimée</p>
                   <p style="color: #0f172a; font-size: 18px; font-weight: bold; margin: 0;">~${clientState.estimatedWaitTime} min</p>
                 </div>
               </div>
@@ -181,17 +209,39 @@ export function ClientSuccessView({ client, position, onReset, queue, waitingCli
         `
             });
             toast({
-                title: "Email envoyé",
-                description: "Le rappel a été envoyé à votre adresse email",
+                title: "Email envoyé avec succès",
+                description: `Un email a été envoyé à ${clientState.email}`,
                 variant: "success"
             });
-        } catch (error) {
+
+            // Ajout d'une notification visuelle temporaire
+            const notificationElem = document.createElement('div');
+            notificationElem.className = 'fixed top-4 right-4 bg-green-100 text-green-800 p-3 rounded shadow-lg z-50 animate-fade-in-out';
+            notificationElem.innerHTML = `<div class="flex items-center"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> Email envoyé à ${clientState.email}</div>`;
+            document.body.appendChild(notificationElem);
+
+            setTimeout(() => {
+                notificationElem.classList.add('animate-fade-out');
+                setTimeout(() => notificationElem.remove(), 500);
+            }, 3000);
+        } catch (error: any) {
             console.error("Erreur lors de l'envoi du mail:", error);
             toast({
                 title: "Échec de l'envoi",
-                description: "Impossible d'envoyer l'email de rappel",
+                description: `Impossible d'envoyer l'email: ${error.message || "Erreur de serveur"}`,
                 variant: "destructive"
             });
+
+            // Ajout d'une notification visuelle d'erreur
+            const errorElem = document.createElement('div');
+            errorElem.className = 'fixed top-4 right-4 bg-red-100 text-red-800 p-3 rounded shadow-lg z-50 animate-fade-in-out';
+            errorElem.innerHTML = `<div class="flex items-center"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg> Échec d'envoi de l'email</div>`;
+            document.body.appendChild(errorElem);
+
+            setTimeout(() => {
+                errorElem.classList.add('animate-fade-out');
+                setTimeout(() => errorElem.remove(), 500);
+            }, 3000);
         } finally {
             setIsSendingNotif(null);
         }
@@ -215,17 +265,39 @@ export function ClientSuccessView({ client, position, onReset, queue, waitingCli
                 message: `${queue.name}: Ticket N°${clientState.token}, Pos: ${clientState.position}, Attente: ~${clientState.estimatedWaitTime}min. Clé: ${clientState.secretKey}. Annuler: ${cancelUrl}`
             });
             toast({
-                title: "SMS envoyé",
-                description: "Le rappel a été envoyé à votre téléphone",
+                title: "SMS envoyé avec succès",
+                description: `Un SMS a été envoyé au ${clientState.phone}`,
                 variant: "success"
             });
-        } catch (error) {
+
+            // Ajout d'une notification visuelle temporaire
+            const notificationElem = document.createElement('div');
+            notificationElem.className = 'fixed top-4 right-4 bg-green-100 text-green-800 p-3 rounded shadow-lg z-50 animate-fade-in-out';
+            notificationElem.innerHTML = `<div class="flex items-center"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 13l4 4L19 7"></path></svg> SMS envoyé au ${clientState.phone}</div>`;
+            document.body.appendChild(notificationElem);
+
+            setTimeout(() => {
+                notificationElem.classList.add('animate-fade-out');
+                setTimeout(() => notificationElem.remove(), 500);
+            }, 3000);
+        } catch (error: any) {
             console.error("Erreur lors de l'envoi du SMS:", error);
             toast({
                 title: "Échec de l'envoi",
-                description: "Impossible d'envoyer le SMS de rappel",
+                description: `Impossible d'envoyer le SMS: ${error.message || "Erreur de serveur"}`,
                 variant: "destructive"
             });
+
+            // Ajout d'une notification visuelle d'erreur
+            const errorElem = document.createElement('div');
+            errorElem.className = 'fixed top-4 right-4 bg-red-100 text-red-800 p-3 rounded shadow-lg z-50 animate-fade-in-out';
+            errorElem.innerHTML = `<div class="flex items-center"><svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path></svg> Échec d'envoi du SMS</div>`;
+            document.body.appendChild(errorElem);
+
+            setTimeout(() => {
+                errorElem.classList.add('animate-fade-out');
+                setTimeout(() => errorElem.remove(), 500);
+            }, 3000);
         } finally {
             setIsSendingNotif(null);
         }

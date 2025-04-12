@@ -198,17 +198,56 @@ export default function QueuePage() {
         setIsSubmitting(true);
 
         try {
+            // Normaliser les données pour la vérification
+            const normalizedName = data.name.toLowerCase().trim();
+            const normalizedEmail = data.email ? data.email.toLowerCase().trim() : '';
+
             // Vérifier les doublons
-            const duplicateCheck = waitingClients.some(client =>
-                client.email === data.email ||
-                client.phone === data.phone ||
-                client.name.toLowerCase() === data.name.toLowerCase()
-            );
+            console.log("Vérification des doublons pour:", {
+                name: normalizedName,
+                email: data.emailNotifications ? normalizedEmail : "désactivé",
+                phone: data.smsNotifications ? data.phone : "désactivé",
+                emailNotif: data.emailNotifications,
+                smsNotif: data.smsNotifications
+            });
+
+            console.log("Clients existants:", waitingClients.map(c => ({
+                name: c.name.toLowerCase().trim(),
+                email: c.email ? c.email.toLowerCase().trim() : '',
+                phone: c.phone
+            })));
+
+            const duplicateCheck = waitingClients.some(client => {
+                // Toujours vérifier le nom
+                const clientName = client.name.toLowerCase().trim();
+                if (clientName === normalizedName) {
+                    console.log("Doublon trouvé - Nom:", client.name, "vs", normalizedName);
+                    return true;
+                }
+
+                // Vérifier l'email uniquement si email notifications est activé
+                if (data.emailNotifications && normalizedEmail && client.email) {
+                    const clientEmail = client.email.toLowerCase().trim();
+                    if (clientEmail === normalizedEmail) {
+                        console.log("Doublon trouvé - Email:", clientEmail, "vs", normalizedEmail);
+                        return true;
+                    }
+                }
+
+                // Vérifier le téléphone uniquement si sms notifications est activé
+                if (data.smsNotifications && data.phone && client.phone &&
+                    client.phone === data.phone) {
+                    console.log("Doublon trouvé - Téléphone:", client.phone, "vs", data.phone);
+                    return true;
+                }
+
+                return false;
+            });
 
             if (duplicateCheck) {
                 toast({
                     title: "Client déjà présent",
-                    description: "Un client avec les mêmes coordonnées est déjà dans la file d'attente.",
+                    description: "Un client avec le même nom est déjà dans la file d'attente.",
                     variant: "destructive"
                 });
 
@@ -484,7 +523,7 @@ export default function QueuePage() {
                         <AlertTitle>Erreur</AlertTitle>
                         <AlertDescription>{clientState.error}</AlertDescription>
                     </Alert>
-                                </div>
+                </div>
             ) : (
                 <Tabs
                     defaultValue="join"
@@ -551,7 +590,7 @@ export default function QueuePage() {
                         />
                     </TabsContent>
                 </Tabs>
-                )}
-            </main>
+            )}
+        </main>
     );
 }
