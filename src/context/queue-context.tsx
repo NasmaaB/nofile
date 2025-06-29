@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import {
     collection,
     query,
@@ -17,14 +17,42 @@ import {
     getDoc,
     increment,
     Timestamp,
-    type Firestore
+    type Firestore,
+    writeBatch
 } from 'firebase/firestore';
 import { db } from '@/lib/firebase';
 import { useAuth } from './auth-context';
 import { Queue, Client, QueueSettings, QueueStats } from '@/types';
-import { generateId, calculateQueueStats } from '@/lib/utils';
+import { generateId, calculateQueueStats, calculateWaitingTime, timestampToDate } from '@/lib/utils';
+import { differenceInMinutes } from 'date-fns';
+import { logError } from '@/lib/logging';
 
-interface QueueContextType {
+// Interface étendue pour QueueSettings avec activeServers
+interface QueueSettingsWithServers extends QueueSettings {
+    activeServers?: number;
+}
+
+// Interface étendue pour Queue avec le settings modifié
+interface QueueWithServers extends Omit<Queue, 'settings'> {
+    settings?: QueueSettingsWithServers;
+}
+
+// Interface étendue pour Client avec des dates explicites
+interface ClientWithDates extends Client {
+    joinedAt: any;
+    servedAt?: any;
+    createdAt: any;
+    updatedAt?: any;
+}
+
+interface LoadingState {
+    queues?: boolean;
+    clients?: boolean;
+    currentQueue?: boolean;
+    updatingEstimates?: boolean;
+}
+
+export interface QueueContextType {
     queues: Queue[];
     currentQueue: Queue | null;
     clients: Client[];
@@ -44,9 +72,11 @@ interface QueueContextType {
     cancelClient: (id: string) => Promise<void>;
     markNoShow: (id: string) => Promise<void>;
     getClient: (id: string) => Promise<Client | null>;
+    getQueue: (id: string) => Promise<Queue | null>;
     getQueueStats: (queueId: string) => Promise<QueueStats>;
     deleteClient: (id: string) => Promise<void>;
     clearQueue: () => Promise<void>;
+    updateWaitingTimesEstimates: (queueId?: string) => Promise<boolean>;
 }
 
 const QueueContext = createContext<QueueContextType | undefined>(undefined);
@@ -415,7 +445,7 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
 
             // Vérifier si averageServiceTime est mis à jour
             if (data.averageServiceTime !== undefined) {
-                // Mettre à jour les temps d'attente estimés des clients
+                console.log("Mise à jour du temps moyen de service:", data.averageServiceTime);
                 await updateWaitingClientsEstimatedTime(id, data.averageServiceTime);
             }
 
@@ -616,6 +646,24 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
             console.error('Erreur lors de la mise à jour du client:', err);
             setError('Erreur lors de la mise à jour du client');
             throw err;
+        }
+    };
+
+    // Récupérer une file d'attente par ID
+    const getQueue = async (id: string): Promise<Queue | null> => {
+        try {
+            const queueRef = doc(db, 'queues', id);
+            const queueSnap = await getDoc(queueRef);
+
+            if (queueSnap.exists()) {
+                return { id: queueSnap.id, ...queueSnap.data() } as Queue;
+            }
+
+            return null;
+        } catch (err) {
+            console.error('Erreur lors de la récupération de la file d\'attente:', err);
+            setError('Erreur lors de la récupération de la file d\'attente');
+            return null;
         }
     };
 
@@ -831,31 +879,78 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     // Mettre à jour les statistiques de la file d'attente
-    const updateQueueStats = async (queueId: string): Promise<void> => {
+    const updateQueueStats = async (queueId: string) => {
         try {
+            // Récupérer les clients récemment servis
             const clientsRef = collection(db, 'clients');
-            const q = query(
+            const servedClientsQuery = query(
                 clientsRef,
                 where('queueId', '==', queueId),
                 where('status', '==', 'served'),
-                orderBy('servedAt', 'desc'),
-                limit(50)
+                orderBy('servedAt', 'desc'), // Tri par date de service (les plus récents d'abord)
+                limit(20) // Limiter aux 20 derniers clients servis pour un calcul plus pertinent
             );
 
-            const snapshot = await getDocs(q);
+            const snapshot = await getDocs(servedClientsQuery);
             const servedClients: any[] = [];
 
-            snapshot.forEach((doc) => {
+            snapshot.forEach(doc => {
                 servedClients.push(doc.data());
             });
 
             const stats = calculateQueueStats(servedClients);
 
-            // Utiliser le temps d'attente moyen comme nouvelle valeur pour averageServiceTime
-            // mais seulement si on a au moins quelques clients servis pour avoir une valeur fiable
-            const newAverageServiceTime = stats.totalServed >= 3 ?
-                Math.max(1, stats.avgWaitTime) : // Minimum 1 minute
-                undefined; // Undefined pour ne pas mettre à jour si pas assez de données
+            // Calcul plus sophistiqué du temps moyen de service
+            let newAverageServiceTime;
+
+            if (stats.totalServed >= 3) {
+                // Récupérer les 10 derniers temps de service individuels (en minutes)
+                const recentServiceTimes = servedClients
+                    .filter(client =>
+                        client.createdAt &&
+                        client.servedAt &&
+                        timestampToDate(client.createdAt) &&
+                        timestampToDate(client.servedAt)
+                    )
+                    .map(client => {
+                        const createdDate = timestampToDate(client.createdAt);
+                        const servedDate = timestampToDate(client.servedAt);
+
+                        if (!createdDate || !servedDate) return 0;
+
+                        // Calculer le temps de service en minutes
+                        const waitMinutes = differenceInMinutes(servedDate, createdDate);
+
+                        // Ignorer les valeurs extrêmes (au-dessus de 60 minutes ou en dessous de 1 minute)
+                        if (waitMinutes < 1 || waitMinutes > 60) return null;
+
+                        return waitMinutes;
+                    })
+                    .filter((time): time is number => time !== null) // Supprimer les valeurs null et indiquer que time est un nombre
+                    .slice(0, 10);  // Prendre les 10 premiers (les plus récents)
+
+                if (recentServiceTimes.length >= 3) {
+                    // Calculer une moyenne pondérée, où les temps récents ont plus de poids
+                    let totalWeight = 0;
+                    let weightedSum = 0;
+
+                    recentServiceTimes.forEach((time, index) => {
+                        // Donner plus de poids aux temps les plus récents
+                        const weight = recentServiceTimes.length - index;
+                        totalWeight += weight;
+                        weightedSum += time * weight;
+                    });
+
+                    // Garantir un minimum de 1 minute
+                    newAverageServiceTime = Math.max(1, Math.round(weightedSum / totalWeight));
+
+                    console.log("Nouveau temps moyen de service calculé:", newAverageServiceTime, "min");
+                } else {
+                    // Utiliser la moyenne simple si pas assez de temps récents
+                    newAverageServiceTime = Math.max(1, stats.avgWaitTime);
+                    console.log("Utilisation de la moyenne simple:", newAverageServiceTime, "min");
+                }
+            }
 
             // Préparer les données à mettre à jour
             const updateData: any = {
@@ -879,37 +974,50 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     };
 
     // Mettre à jour le temps d'attente estimé pour tous les clients en attente
-    const updateWaitingClientsEstimatedTime = async (queueId: string, averageServiceTime: number): Promise<void> => {
+    const updateWaitingClientsEstimatedTime = async (queueId: string, newAverageServiceTime: number) => {
         try {
-            // Récupérer tous les clients en attente pour cette file
+            // Récupérer les informations de la file d'attente
+            const queueRef = doc(db, 'queues', queueId);
+            const queueSnap = await getDoc(queueRef);
+
+            if (!queueSnap.exists()) {
+                throw new Error("File d'attente introuvable");
+            }
+
+            const queue = queueSnap.data() as QueueWithServers;
+            // Utiliser 1 comme valeur par défaut 
+            const activeServers = queue.settings?.activeServers ?? 1;
+
+            // Récupérer les clients en attente
             const clientsRef = collection(db, 'clients');
-            const q = query(
+            const waitingClientsQuery = query(
                 clientsRef,
                 where('queueId', '==', queueId),
                 where('status', '==', 'waiting'),
-                orderBy('position', 'asc')
+                orderBy('position')
             );
 
-            const snapshot = await getDocs(q);
+            const snapshot = await getDocs(waitingClientsQuery);
             const batch: Promise<void>[] = [];
 
-            snapshot.forEach((doc) => {
-                const client = doc.data();
-                // Calculer le nouveau temps d'attente estimé
-                const newEstimatedTime = client.position * averageServiceTime;
+            snapshot.docs.forEach((docSnapshot, index) => {
+                const position = index + 1;
+                const estimatedMinutes = calculateWaitingTime(
+                    position,
+                    newAverageServiceTime,
+                    activeServers
+                );
 
-                batch.push(updateDoc(doc.ref, {
-                    estimatedWaitTime: newEstimatedTime
+                batch.push(updateDoc(docSnapshot.ref, {
+                    estimatedWaitTime: estimatedMinutes,
+                    updatedAt: serverTimestamp()
                 }));
             });
 
-            // Exécuter toutes les mises à jour en parallèle
-            if (batch.length > 0) {
-                await Promise.all(batch);
-                console.log(`Temps d'attente mis à jour pour ${batch.length} clients`);
-            }
+            await Promise.all(batch);
+            console.log(`Temps d'attente estimé mis à jour pour ${batch.length} clients`);
         } catch (err) {
-            console.error('Erreur lors de la mise à jour des temps d\'attente estimés:', err);
+            console.error("Erreur lors de la mise à jour des temps d'attente estimés:", err);
         }
     };
 
@@ -1040,6 +1148,214 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         }
     };
 
+    /**
+     * Met à jour les temps d'attente estimés pour tous les clients en attente
+     */
+    const updateWaitingTimesEstimates = async (queueId?: string): Promise<boolean> => {
+        try {
+            // Vérifier si nous avons un utilisateur authentifié
+            if (!user) {
+                throw new Error("Vous devez être connecté pour mettre à jour les estimations de temps d'attente");
+            }
+
+            // Utiliser la file d'attente actuelle si aucun ID n'est fourni
+            const targetQueueId = queueId || (currentQueue?.id || "");
+            if (!targetQueueId) {
+                throw new Error("Aucune file d'attente sélectionnée");
+            }
+
+            // Mettre à jour l'état de chargement
+            if (typeof setLoading === 'function') {
+                if (typeof loading === 'boolean') {
+                    setLoading(true);
+                } else if (loading && typeof loading === 'object') {
+                    setLoading(Object.assign({}, loading, { updatingEstimates: true }));
+                }
+            }
+
+            // Récupérer les temps de service des clients récemment servis
+            const threeDaysAgo = new Date();
+            threeDaysAgo.setDate(threeDaysAgo.getDate() - 3);
+
+            // Récupérer les clients servis récemment
+            const serviceTimesRef = collection(db, 'clients');
+            const serviceTimesQuery = query(
+                serviceTimesRef,
+                where("queueId", "==", targetQueueId),
+                where("status", "==", "served"),
+                where("servedAt", "!=", null),
+                orderBy("servedAt", "desc"),
+                limit(20)
+            );
+
+            const serviceTimesSnapshot = await getDocs(serviceTimesQuery);
+            const recentServiceTimes: number[] = [];
+            const hourlyServiceTimes: { [hour: number]: number[] } = {};
+
+            // Calculer les temps de service récents
+            serviceTimesSnapshot.forEach(doc => {
+                const data = doc.data();
+
+                // Calculer le temps de service entre l'appel et le service
+                if (data.servedAt && data.calledAt) {
+                    const calledTime = timestampToDate(data.calledAt);
+                    const servedTime = timestampToDate(data.servedAt);
+
+                    if (calledTime && servedTime) {
+                        // Calculer le temps de service en minutes
+                        const serviceTimeMinutes = (servedTime.getTime() - calledTime.getTime()) / (1000 * 60);
+
+                        // Ne considérer que les temps raisonnables (entre 1 et 60 minutes)
+                        if (serviceTimeMinutes >= 1 && serviceTimeMinutes <= 60) {
+                            recentServiceTimes.push(serviceTimeMinutes);
+
+                            // Regrouper les temps de service par heure pour détecter les heures de pointe
+                            const hour = servedTime.getHours();
+                            if (!hourlyServiceTimes[hour]) {
+                                hourlyServiceTimes[hour] = [];
+                            }
+                            hourlyServiceTimes[hour].push(serviceTimeMinutes);
+                        }
+                    }
+                }
+            });
+
+            // Récupérer tous les clients en attente
+            const waitingClientsRef = collection(db, 'clients');
+            const waitingClientsQuery = query(
+                waitingClientsRef,
+                where("queueId", "==", targetQueueId),
+                where("status", "==", "waiting"),
+                orderBy("position", "asc")
+            );
+
+            const waitingClientsSnapshot = await getDocs(waitingClientsQuery);
+
+            // Récupérer les paramètres de la file d'attente
+            const queueRef = doc(db, 'queues', targetQueueId);
+            const queueSnapshot = await getDoc(queueRef);
+
+            if (!queueSnapshot.exists()) {
+                throw new Error("File d'attente non trouvée");
+            }
+
+            const queueData = queueSnapshot.data();
+            const settings = queueData.settings || {};
+
+            // Récupérer le nombre de serveurs actifs depuis les paramètres de la file
+            const activeServers = settings.activeServers || 1;
+            const averageServiceTime = queueData.averageServiceTime || 5;
+
+            // Déterminer si nous sommes actuellement en heure de pointe
+            const currentHour = new Date().getHours();
+            let peakHourFactor = 1.0;
+
+            // Si nous avons assez de données pour cette heure
+            if (hourlyServiceTimes[currentHour] && hourlyServiceTimes[currentHour].length >= 5) {
+                const hourlyAvg = hourlyServiceTimes[currentHour].reduce((sum, time) => sum + time, 0) /
+                    hourlyServiceTimes[currentHour].length;
+
+                // Si le temps moyen à cette heure est plus long que la moyenne générale
+                if (hourlyAvg > averageServiceTime) {
+                    // Augmenter le facteur d'heure de pointe (jusqu'à 30% de plus)
+                    peakHourFactor = Math.min(1.3, hourlyAvg / averageServiceTime);
+                }
+            }
+
+            // Créer un batch pour les mises à jour
+            const batch = writeBatch(db);
+            let updatedCount = 0;
+            const waitingClientsCount = waitingClientsSnapshot.size;
+
+            // Mettre à jour chaque client en attente
+            waitingClientsSnapshot.forEach((docSnapshot) => {
+                const data = docSnapshot.data();
+                const clientRef = docSnapshot.ref;
+                const position = data.position || 0;
+                const joinedAt = data.joinedAt;
+
+                // Estimation du moment où le client sera servi
+                const joinedAtDate = joinedAt ? timestampToDate(joinedAt) : null;
+                const now = new Date();
+                const waitedSoFar = joinedAtDate ?
+                    Math.max(0, (now.getTime() - joinedAtDate.getTime()) / (1000 * 60)) : 0;
+
+                // Calculer le temps d'attente estimé avec tous les paramètres disponibles
+                const estimatedWaitTime = calculateWaitingTime(
+                    position,
+                    averageServiceTime * peakHourFactor, // Appliquer le facteur d'heure de pointe
+                    activeServers,
+                    recentServiceTimes,
+                    waitingClientsCount // Passer la taille de la file d'attente
+                );
+
+                // Soustraire le temps déjà attendu (mais ne pas descendre en dessous de 1)
+                const remainingWaitTime = Math.max(1, estimatedWaitTime - waitedSoFar);
+
+                batch.update(clientRef, {
+                    estimatedWaitTime: Math.round(remainingWaitTime),
+                    updatedAt: serverTimestamp()
+                });
+                updatedCount++;
+            });
+
+            // Mettre à jour la file d'attente avec le timestamp de dernière mise à jour
+            batch.update(queueRef, {
+                updatedAt: serverTimestamp()
+            });
+
+            // Exécuter le batch
+            await batch.commit();
+            console.log(`${updatedCount} clients ont eu leur temps d'attente mis à jour`);
+
+            // Si nous avons assez de données récentes, mettre à jour le temps moyen de service
+            if (recentServiceTimes.length >= 5) {
+                const avgRecentServiceTime = recentServiceTimes.reduce((sum, time) => sum + time, 0) / recentServiceTimes.length;
+
+                // Vérifier si le temps moyen récent diffère significativement du temps moyen enregistré
+                const difference = Math.abs(avgRecentServiceTime - averageServiceTime);
+                const percentageDifference = (difference / averageServiceTime) * 100;
+
+                // Si la différence est supérieure à 20%, mettre à jour le temps moyen
+                if (percentageDifference > 20) {
+                    // Combiner l'ancien et le nouveau temps (70% nouveau, 30% ancien)
+                    const newAverageServiceTime = (avgRecentServiceTime * 0.7) + (averageServiceTime * 0.3);
+
+                    await updateDoc(queueRef, {
+                        averageServiceTime: Math.round(newAverageServiceTime * 10) / 10, // Arrondi à 1 décimale
+                        updatedAt: serverTimestamp()
+                    });
+
+                    console.log(`Temps moyen de service mis à jour: ${averageServiceTime} -> ${Math.round(newAverageServiceTime * 10) / 10} minutes`);
+                }
+            }
+
+            // Réinitialiser l'état de chargement
+            if (typeof setLoading === 'function') {
+                if (typeof loading === 'boolean') {
+                    setLoading(false);
+                } else if (loading && typeof loading === 'object') {
+                    setLoading(Object.assign({}, loading, { updatingEstimates: false }));
+                }
+            }
+
+            return true;
+        } catch (error) {
+            console.error("Erreur lors de la mise à jour des estimations:", error);
+            setError("Erreur lors de la mise à jour des estimations de temps d'attente");
+
+            if (typeof setLoading === 'function') {
+                if (typeof loading === 'boolean') {
+                    setLoading(false);
+                } else if (loading && typeof loading === 'object') {
+                    setLoading(Object.assign({}, loading, { updatingEstimates: false }));
+                }
+            }
+
+            return false;
+        }
+    };
+
     const value = {
         queues,
         currentQueue,
@@ -1060,9 +1376,11 @@ export const QueueProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         cancelClient,
         markNoShow,
         getClient,
+        getQueue,
         getQueueStats,
         deleteClient,
-        clearQueue
+        clearQueue,
+        updateWaitingTimesEstimates
     };
 
     return <QueueContext.Provider value={value}>{children}</QueueContext.Provider>;

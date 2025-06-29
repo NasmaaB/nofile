@@ -10,6 +10,7 @@ import {
     User,
     Clock,
 } from 'lucide-react';
+import { calculateWaitingTime } from '@/lib/utils';
 
 // Types simplifiés
 interface Client {
@@ -21,6 +22,9 @@ interface Client {
 interface Queue {
     averageServiceTime?: number;
     maxClients?: number;
+    settings?: {
+        activeServers?: number;
+    };
 }
 
 interface FormData {
@@ -457,9 +461,14 @@ export function JoinQueueForm({
     // Calculer la position estimée dans la file d'attente
     const estimatedPosition = waitingClients.length + 1;
 
-    // Calculer le temps d'attente estimé
+    // Calculer le temps d'attente estimé en utilisant la fonction améliorée
     const averageServiceTime = queue.averageServiceTime || 5; // 5 minutes par défaut
-    const estimatedWaitTime = estimatedPosition * averageServiceTime;
+    const activeServers = queue.settings?.activeServers || 1;
+    const estimatedWaitTime = calculateWaitingTime(
+        estimatedPosition,
+        averageServiceTime,
+        activeServers
+    );
 
     // Vérifier si la file d'attente est pleine
     const queueIsFull = queue.maxClients ? waitingClients.length >= queue.maxClients : false;

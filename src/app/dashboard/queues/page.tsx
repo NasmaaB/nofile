@@ -209,7 +209,7 @@ export default function QueuesPage() {
                                             size="icon"
                                             onClick={(e) => {
                                                 e.stopPropagation();
-                                                handleToggleQueueActive(queue.id, queue.isActive);
+                                                handleToggleQueueActive(queue.id, queue.isActive || false);
                                             }}
                                             className={queue.isActive ? 'text-green-600' : 'text-muted-foreground'}
                                         >
@@ -248,7 +248,7 @@ export default function QueuesPage() {
                                         <div className="w-full bg-muted h-1.5 rounded-full">
                                             <div
                                                 className="bg-primary h-1.5 rounded-full"
-                                                style={{ width: `${Math.min(100, (queue.dailyCounter / (queue.maxClients || 1)) * 100)}%` }}
+                                                style={{ width: `${Math.min(100, ((queue.dailyCounter || 0) / (queue.maxClients || 1)) * 100)}%` }}
                                             ></div>
                                         </div>
                                     </div>

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useQueue } from './use-queues';
 import { Client } from '@/types';
-import { toJSDate } from '@/lib/utils';
+import { toDate } from '@/lib/utils';
 
 // Type du contexte de la file d'attente
 interface QueueContextType {
@@ -68,8 +68,8 @@ export const useClients = () => {
                     break;
                 case 'date':
                     // Utiliser notre fonction utilitaire pour convertir en date JS
-                    const aDate = toJSDate(a.createdAt);
-                    const bDate = toJSDate(b.createdAt);
+                    const aDate = toDate(a.createdAt);
+                    const bDate = toDate(b.createdAt);
                     const aTime = aDate ? aDate.getTime() : 0;
                     const bTime = bDate ? bDate.getTime() : 0;
                     comparison = aTime - bTime;
@@ -91,7 +91,7 @@ export const useClients = () => {
             if (!client.servedAt) return false;
 
             // Utiliser notre fonction utilitaire
-            const servedDate = toJSDate(client.servedAt);
+            const servedDate = toDate(client.servedAt);
             if (!servedDate) return false;
 
             servedDate.setHours(0, 0, 0, 0);

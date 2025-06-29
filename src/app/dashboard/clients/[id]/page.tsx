@@ -37,7 +37,20 @@ import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/components/ui/use-toast';
 import { useQueue } from '@/context/queue-context';
 import { Client } from '@/types';
-import { formatDate, formatPhoneNumber, timeAgo, cn } from '@/lib/utils';
+import { formatDate, formatPhoneNumber, timeAgo, cn, toDate } from '@/lib/utils';
+import WaitingTimeEstimate from '@/components/clients/WaitingTimeEstimate';
+
+// Interface étendue pour Client avec les propriétés supplémentaires nécessaires
+interface ExtendedClient extends Omit<Client, 'status'> {
+    status: 'waiting' | 'served' | 'cancelled' | 'canceled' | 'no-show' | 'serving';
+    notifiedAt?: any;
+    calledAt?: any;
+    updatedAt?: any;
+    notes?: string;
+}
+
+// Extension du type pour inclure "serving" comme état possible
+type ClientStatus = 'waiting' | 'served' | 'cancelled' | 'canceled' | 'no-show' | 'serving';
 
 interface TimelineEvent {
     date: Date | Timestamp;
@@ -53,7 +66,7 @@ export default function ClientDetailsPage() {
     const router = useRouter();
     const { toast } = useToast();
     const { getClient, updateClient, cancelClient, serveClient } = useQueue();
-    const [client, setClient] = useState<Client | null>(null);
+    const [client, setClient] = useState<ExtendedClient | null>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [actionLoading, setActionLoading] = useState(false);
@@ -80,7 +93,8 @@ export default function ClientDetailsPage() {
                 const clientData = await getClient(clientId);
 
                 if (clientData) {
-                    setClient(clientData);
+                    // Convertir les données du Client en ExtendedClient
+                    setClient(clientData as unknown as ExtendedClient);
                 } else {
                     setError('Client introuvable');
                 }
@@ -129,7 +143,7 @@ export default function ClientDetailsPage() {
 
         try {
             await cancelClient(client.id);
-            setClient(prev => (prev ? { ...prev, status: 'canceled' } : null));
+            setClient(prev => (prev ? { ...prev, status: 'cancelled' } : null));
             toast({
                 title: "Client annulé",
                 description: `${client.name} a été retiré de la file d'attente.`,
@@ -186,7 +200,12 @@ export default function ClientDetailsPage() {
     }
 
     // Configuration de l'affichage du statut
-    const statusConfig = {
+    const statusConfig: Record<ClientStatus, {
+        color: string;
+        icon: React.ReactNode;
+        label: string;
+        description: string;
+    }> = {
         waiting: {
             color: 'bg-primary/10 text-primary border-primary/20',
             icon: <Clock className="h-5 w-5" />,
@@ -205,7 +224,13 @@ export default function ClientDetailsPage() {
             label: 'Servi',
             description: 'Client servi avec succès'
         },
-        canceled: {
+        cancelled: {
+            color: 'bg-red-500/10 text-red-500 border-red-500/20',
+            icon: <XCircle className="h-5 w-5" />,
+            label: 'Annulé',
+            description: 'Client annulé'
+        },
+        'canceled': {
             color: 'bg-red-500/10 text-red-500 border-red-500/20',
             icon: <XCircle className="h-5 w-5" />,
             label: 'Annulé',
@@ -219,7 +244,9 @@ export default function ClientDetailsPage() {
         }
     };
 
-    const status = statusConfig[client.status] || statusConfig.waiting;
+    // Traiter le statut comme ClientStatus pour éviter les erreurs de type
+    const clientStatus = client.status as ClientStatus;
+    const status = statusConfig[clientStatus] || statusConfig.waiting;
 
     // Récupérer les événements chronologiques triés par date
     const timelineEvents: TimelineEvent[] = [
@@ -251,9 +278,9 @@ export default function ClientDetailsPage() {
             title: 'Client servi',
             color: 'bg-green-500/10'
         }] : []),
-        ...(client.status === 'canceled' ? [{
+        ...(client.status === 'cancelled' ? [{
             date: client.updatedAt || new Date(),
-            type: 'canceled',
+            type: 'cancelled',
             icon: <XCircle className="h-4 w-4 text-red-500" />,
             title: 'Client annulé',
             color: 'bg-red-500/10'
@@ -274,8 +301,8 @@ export default function ClientDetailsPage() {
             current: true
         }] : [])
     ].sort((a, b) => {
-        const dateA = a.date instanceof Date ? a.date : a.date.toDate();
-        const dateB = b.date instanceof Date ? b.date : b.date.toDate();
+        const dateA = toDate(a.date) || new Date();
+        const dateB = toDate(b.date) || new Date();
         return dateA.getTime() - dateB.getTime();
     });
 
@@ -317,7 +344,7 @@ export default function ClientDetailsPage() {
                                 </div>
                                 <CardDescription className="text-base max-w-md">
                                     {status.description}
-                                    {client.status === 'waiting' && client.position > 0 ? ` • Position ${client.position}` : ''}
+                                    {client.status === 'waiting' && (client.position !== undefined && client.position > 0) ? ` • Position ${client.position}` : ''}
                                 </CardDescription>
                             </div>
 
@@ -332,12 +359,12 @@ export default function ClientDetailsPage() {
                                         <Tooltip>
                                             <TooltipTrigger asChild>
                                                 <div className="flex flex-col items-center justify-center bg-primary/5 rounded-lg px-5 py-2 border border-primary/10">
-                                                    <span className="text-sm text-muted-foreground">Attente</span>
-                                                    <span className="text-2xl font-bold text-primary">{client.estimatedWaitTime || 0}<span className="text-sm font-normal"> min</span></span>
+                                                    <span className="text-sm text-muted-foreground">Position</span>
+                                                    <span className="text-2xl font-bold text-primary">{client.position || '?'}</span>
                                                 </div>
                                             </TooltipTrigger>
                                             <TooltipContent>
-                                                <p>Temps d'attente estimé</p>
+                                                <p>Position dans la file d'attente</p>
                                             </TooltipContent>
                                         </Tooltip>
                                     </TooltipProvider>
@@ -372,6 +399,13 @@ export default function ClientDetailsPage() {
 
                         <div className="p-6">
                             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {client.status === 'waiting' && (
+                                    <WaitingTimeEstimate
+                                        client={client as unknown as Client}
+                                        className="sm:col-span-2 lg:col-span-1"
+                                    />
+                                )}
+
                                 {client.notifiedAt && (
                                     <div className="space-y-1.5">
                                         <div className="text-sm font-medium text-muted-foreground">Dernière notification</div>
@@ -471,7 +505,7 @@ export default function ClientDetailsPage() {
                                 </motion.div>
                             )}
 
-                            {client.status === 'serving' && (
+                            {(clientStatus === 'serving') && (
                                 <motion.div
                                     className="flex flex-wrap gap-3 w-full"
                                     initial={{ opacity: 0, y: 5 }}
@@ -522,6 +556,7 @@ export default function ClientDetailsPage() {
                             )}
 
                             {(client.status === 'served' ||
+                                client.status === 'cancelled' ||
                                 client.status === 'canceled' ||
                                 client.status === 'no-show') && (
                                     <motion.div

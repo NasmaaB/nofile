@@ -171,7 +171,7 @@ const LoginForm: React.FC = () => {
                 <CardFooter className="justify-center">
                     <p className="text-sm text-center text-muted-foreground">
                         Vous n'avez pas de compte ?{' '}
-                        <Link href="/register" className="text-primary hover:underline">
+                        <Link href="/auth/register" className="text-primary hover:underline">
                             S'inscrire
                         </Link>
                     </p>

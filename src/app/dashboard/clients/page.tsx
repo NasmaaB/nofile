@@ -686,7 +686,7 @@ export default function ClientsPage() {
                                             className="col-span-3"
                                         />
                                     </div>
-                                    <div className="grid gap-2 mt-3">
+                                    {/* <div className="grid gap-2 mt-3">
                                         <label htmlFor="notes" className="text-sm font-medium">
                                             Notes
                                         </label>
@@ -697,7 +697,7 @@ export default function ClientsPage() {
                                             placeholder="Informations supplémentaires..."
                                             className="col-span-3"
                                         />
-                                    </div>
+                                    </div> */}
                                     {/* Bouton de soumission caché pour capturer l'événement Entrée */}
                                     <button type="submit" className="sr-only">Soumettre</button>
                                 </form>
@@ -1005,13 +1005,13 @@ export default function ClientsPage() {
                                                 </div>
 
                                                 {/* Notes */}
-                                                {client.notes !== undefined && (
+                                                {/* {client.notes !== undefined && (
                                                     <div className="mt-2 pt-2 border-t text-xs">
                                                         <p className="text-muted-foreground line-clamp-1">
                                                             <span className="font-medium">Notes:</span> {client.notes}
                                                         </p>
                                                     </div>
-                                                )}
+                                                )} */}
                                             </CardContent>
                                         </Card>
                                     </motion.div>

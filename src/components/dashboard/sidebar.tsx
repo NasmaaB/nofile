@@ -85,23 +85,23 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                 href: '/dashboard',
                 icon: <Home className="h-5 w-5" />
             },
-            {
-                name: "Files d'attente",
-                href: '/dashboard/queues',
-                icon: <ListOrdered className="h-5 w-5" />,
-                dropdown: true,
-                expanded: queuesExpanded,
-                onExpand: () => setQueuesExpanded((prev) => !prev),
-                children: queues.map((queue) => ({
-                    name: queue.name,
-                    href: `/dashboard/queues/${queue.id}`,
-                    active: currentQueue?.id === queue.id,
-                    onClick: () => {
-                        setCurrentQueue(queue);
-                        setQueuesExpanded(true);
-                    }
-                }))
-            },
+            // {
+            //     name: "Files d'attente",
+            //     href: '/dashboard/queues',
+            //     icon: <ListOrdered className="h-5 w-5" />,
+            //     dropdown: true,
+            //     expanded: queuesExpanded,
+            //     onExpand: () => setQueuesExpanded((prev) => !prev),
+            //     children: queues.map((queue) => ({
+            //         name: queue.name,
+            //         href: `/dashboard/queues/${queue.id}`,
+            //         active: currentQueue?.id === queue.id,
+            //         onClick: () => {
+            //             setCurrentQueue(queue);
+            //             setQueuesExpanded(true);
+            //         }
+            //     }))
+            // },
             {
                 name: 'Clients',
                 href: '/dashboard/clients',
@@ -140,17 +140,28 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
             </div>
 
             <div className="px-3 mb-6">
-                <Link href="/dashboard/queues/create">
+                {canCreateQueue ? (
+                    <Link href="/dashboard/queues/create">
+                        <Button
+                            variant="gradient"
+                            className="w-full justify-start"
+                            leftIcon={<Plus className="h-4 w-4" />}
+                            animation="glow"
+                        >
+                            Nouvelle file
+                        </Button>
+                    </Link>
+                ) : (
                     <Button
                         variant="gradient"
                         className="w-full justify-start"
-                        disabled={!canCreateQueue}
+                        disabled
                         leftIcon={<Plus className="h-4 w-4" />}
                         animation="glow"
                     >
                         Nouvelle file
                     </Button>
-                </Link>
+                )}
                 {!canCreateQueue && (
                     <p className="text-xs text-muted-foreground mt-2">
                         Limite de {maxQueues} file{maxQueues > 1 ? 's' : ''} atteinte.
@@ -167,9 +178,19 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
             <div className="space-y-1 px-3">
                 {navItems.map((item) => (
                     <div key={item.name} className="mb-2">
-                        <Link
+                        {/*<Link
                             href={item.dropdown ? '#' : item.href}
                             onClick={item.dropdown ? item.onExpand : undefined}
+                            className={cn(
+                                'flex items-center justify-between p-2 rounded-md w-full transition-colors duration-200',
+                                pathname === item.href
+                                    ? 'bg-accent text-accent-foreground'
+                                    : 'hover:bg-accent/50 hover:text-accent-foreground'
+                            )}
+                        >  */}
+                        <Link
+                            href={item.href}
+                            onClick={undefined}
                             className={cn(
                                 'flex items-center justify-between p-2 rounded-md w-full transition-colors duration-200',
                                 pathname === item.href
@@ -181,7 +202,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                                 <span className="mr-3 text-muted-foreground">{item.icon}</span>
                                 <span>{item.name}</span>
                             </div>
-                            {item.dropdown && (
+                            {/* {item.dropdown && (
                                 <span>
                                     {item.expanded ? (
                                         <ChevronDown className="h-4 w-4" />
@@ -189,10 +210,11 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                                         <ChevronRight className="h-4 w-4" />
                                     )}
                                 </span>
-                            )}
+                            )} */}
+
                         </Link>
 
-                        {item.dropdown && item.expanded && item.children && (
+                        {/* {item.dropdown && item.expanded && item.children && (
                             <motion.div
                                 layout
                                 transition={{ duration: 0.2 }}
@@ -204,7 +226,7 @@ const Sidebar: React.FC<SidebarProps> = ({ className }) => {
                                     ))}
                                 </div>
                             </motion.div>
-                        )}
+                        )} */}
                     </div>
                 ))}
             </div>
