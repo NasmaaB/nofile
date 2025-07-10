@@ -1,0 +1,303 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 50% 98%;
+    --foreground: 222.2 84% 4.9%;
+
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+
+    --primary: 199 89% 48%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+
+    --accent: 339 90% 51%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+
+    --radius: 0.75rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+
+    --primary: 199 89% 48%;
+    --primary-foreground: 210 40% 98%;
+
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+
+    --accent: 339 90% 51%;
+    --accent-foreground: 210 40% 98%;
+
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
+}
+
+@layer base {
+  * {
+    border-color: hsl(var(--border));
+  }
+
+  body {
+    background-color: hsl(var(--background));
+    color: hsl(var(--foreground));
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    font-weight: 600;
+    letter-spacing: -0.025em;
+  }
+
+  h1 {
+    font-size: 2.25rem;
+    /* text-4xl */
+  }
+
+  @media (min-width: 768px) {
+    h1 {
+      font-size: 3rem;
+      /* md:text-5xl */
+    }
+  }
+
+  h2 {
+    font-size: 1.875rem;
+    /* text-3xl */
+  }
+
+  @media (min-width: 768px) {
+    h2 {
+      font-size: 2.25rem;
+      /* md:text-4xl */
+    }
+  }
+
+  h3 {
+    font-size: 1.5rem;
+    /* text-2xl */
+  }
+
+  @media (min-width: 768px) {
+    h3 {
+      font-size: 1.875rem;
+      /* md:text-3xl */
+    }
+  }
+
+  h4 {
+    font-size: 1.25rem;
+    /* text-xl */
+  }
+
+  @media (min-width: 768px) {
+    h4 {
+      font-size: 1.5rem;
+      /* md:text-2xl */
+    }
+  }
+}
+
+/* Classes pour les animations personnalisées */
+@layer components {
+  .card-hover {
+    box-shadow: 0 1px 3px 0 rgb(0 0 0 / 0.1), 0 1px 2px -1px rgb(0 0 0 / 0.1);
+    transition-property: all;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+  }
+
+  .card-hover:hover {
+    box-shadow: 0 10px 15px -3px rgb(0 0 0 / 0.1), 0 4px 6px -4px rgb(0 0 0 / 0.1);
+    transform: translateY(-5px);
+  }
+
+  .glass-effect {
+    background-color: rgba(255, 255, 255, 0.2);
+    backdrop-filter: blur(16px);
+    border-radius: 0.5rem;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+  }
+
+  .glow-effect {
+    position: relative;
+  }
+
+  .glow-effect::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: 0.5rem;
+    opacity: 0;
+    transition-property: opacity;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 300ms;
+    box-shadow: 0 0 15px 5px rgba(12, 165, 233, 0.3);
+  }
+
+  .glow-effect:hover::after {
+    opacity: 1;
+  }
+
+  .glow-effect-accent::after {
+    box-shadow: 0 0 15px 5px rgba(244, 63, 94, 0.3);
+  }
+
+  .rotate-on-hover:hover {
+    transform: rotate(3deg);
+    transition-property: transform;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+
+  .scale-on-hover:hover {
+    transform: scale(1.05);
+    transition-property: transform;
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    transition-duration: 150ms;
+  }
+
+  .floating-animation {
+    animation: bounce-light 3s ease-in-out infinite;
+  }
+
+  .slide-in {
+    animation: slide-in-right 0.4s ease-out;
+  }
+
+  .fade-in {
+    animation: fade-in 0.3s ease-out;
+  }
+
+  .nofile-gradient {
+    background-image: linear-gradient(to right, #0ca5e9, #f43f5e);
+  }
+
+  .nofile-text-gradient {
+    color: transparent;
+    background-clip: text;
+    background-image: linear-gradient(to right, #0ca5e9, #f43f5e);
+  }
+
+  .nofile-border-gradient {
+    border: 2px solid transparent;
+    background-image: linear-gradient(to right, #0ca5e9, #f43f5e);
+    mask-border: 2;
+  }
+}
+
+/* Animation de chargement spécifique à NoFile */
+.nofile-spinner {
+  height: 2rem;
+  width: 2rem;
+  animation: rotate-360 1s linear infinite;
+  border: 4px solid;
+  border-color: #7cd4fd;
+  /* nofile-300 */
+  border-top-color: #0284c7;
+  /* nofile-600 */
+  border-radius: 9999px;
+}
+
+/* Masques pour les bordures gradient */
+.mask-border-2 {
+  mask: linear-gradient(#fff 0 0) content-box, linear-gradient(#fff 0 0);
+  mask-composite: exclude;
+  -webkit-mask-composite: xor;
+}
+
+/* Pour les scrollbars personnalisées */
+@layer utilities {
+  .scrollbar-thin {
+    scrollbar-width: thin;
+  }
+
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+
+  .scrollbar-none::-webkit-scrollbar {
+    display: none;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background-color: hsl(var(--muted));
+    border-radius: 9999px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background-color: hsla(var(--primary), 0.6);
+    border-radius: 9999px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--primary));
+  }
+}
+
+/* Effets de transition entre les pages */
+.page-transition-enter {
+  opacity: 0;
+  transform: translateY(20px);
+}
+
+.page-transition-enter-active {
+  opacity: 1;
+  transform: translateY(0);
+  transition: opacity 0.3s, transform 0.3s;
+}
+
+.page-transition-exit {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.page-transition-exit-active {
+  opacity: 0;
+  transform: translateY(-20px);
+  transition: opacity 0.3s, transform 0.3s;
+}

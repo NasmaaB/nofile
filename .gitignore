@@ -39,3 +39,33 @@ yarn-error.log*
 # typescript
 *.tsbuildinfo
 next-env.d.ts
+
+# firebase
+.firebase/
+firebase-debug.log
+firebase-debug.*.log
+*.cache
+
+# Local Netlify folder
+.netlify
+
+.next/
+
+# Node
+node_modules/
+dist/
+.next/
+
+# Firebase
+functions/lib/
+functions/node_modules/
+functions/.env
+functions/.env.local
+
+# Logs
+*.log
+npm-debug.log*
+
+# OS
+.DS_Store
+Thumbs.db
