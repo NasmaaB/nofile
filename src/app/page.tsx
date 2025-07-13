@@ -12,12 +12,18 @@ import {
   BarChart2,
   ChevronRight,
   ArrowRight,
-  Check
+  Check,
+  Twitter, Linkedin, Github
 } from 'lucide-react';
 
 import { Button } from '@/components/ui/button';
 import Logo from '@/components/common/logo_nofile';
+import LogoSmall from '@/components/common/logo_small';
 import dynamic from 'next/dynamic';
+import PricingSection from '@/components/homeComponents/pricingSection';
+import TestimonialsSection from '@/components/homeComponents/testimonialsSection';
+
+
 
 // Dynamic imports to avoid SSR issues
 const Lottie = dynamic(() => import('lottie-react'), { ssr: false });
@@ -51,6 +57,41 @@ const staggerContainer = {
 export default function HomePage() {
   // Animation data state to avoid hydration issues
   const [animationData, setAnimationData] = useState<any>(null);
+
+  // pricing section
+  const prices = {
+    basic: 39,
+    premium: 69,
+  };
+
+  // feature - fonctionnalite 
+  const features = [
+    {
+      icon: <Users className="h-6 w-6 text-primary" />,
+      title: 'Ajout rapide avec contact',
+      desc: 'Enregistrez un client en quelques secondes avec nom et téléphone.',
+    },
+    {
+      icon: <Clock className="h-6 w-6 text-primary" />,
+      title: 'Suivi en temps réel',
+      desc: 'Visualisez la progression des clients dans la file à tout moment.',
+    },
+    {
+      icon: <QrCode className="h-6 w-6 text-primary" />,
+      title: 'Inscription par QR code',
+      desc: 'Vos clients scannent, rejoignent la file et reçoivent leur numéro instantanément.',
+    },
+    {
+      icon: <Bell className="h-6 w-6 text-primary" />,
+      title: 'Notifications automatiques',
+      desc: 'Prévenez les clients quand leur tour approche sans lever le petit doigt.',
+    },
+    {
+      icon: <BarChart2 className="h-6 w-6 text-primary" />,
+      title: 'Statistiques détaillées',
+      desc: 'Analysez vos pics d’affluence et temps d’attente moyen.',
+    },
+  ];
 
   useEffect(() => {
     import('@/animations/animation.json').then((data) => {
@@ -261,19 +302,21 @@ export default function HomePage() {
 
         {/* Features Section */}
         <section id="features" className="py-12 sm:py-16 md:py-24 px-4 sm:px-6 bg-accent/5">
-          <div className="container mx-auto">
+          <div className="container mx-auto max-w-5xl">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
-              className="text-center mb-12 sm:mb-16"
+              className="text-center mb-10 sm:mb-16"
             >
               <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
-                Des fonctionnalités conçues pour <span className="nofile-text-gradient">l'efficacité</span>
+                Des fonctionnalités conçues pour{' '}
+                <span className="nofile-text-gradient">l'efficacité</span>
               </h2>
-              <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
-                Découvrez les outils innovants qui vous permettront de fluidifier votre gestion des files d'attente.
+              <p className="sm:hidden text-xs sm:text-sm md:text-base lg:text-lg text-muted-foreground text-justify max-w-2xl mx-auto">
+                Découvrez les outils clés qui simplifient la gestion des files d'attente — vos clients peuvent même
+                s’inscrire d’un simple scan.
               </p>
             </motion.div>
 
@@ -282,166 +325,38 @@ export default function HomePage() {
               whileInView="visible"
               viewport={{ once: true }}
               variants={staggerContainer}
-              className="grid gap-6 sm:gap-8 md:grid-cols-2 lg:grid-cols-3"
+              className="grid gap-6 sm:gap-8 md:grid-cols-2 xl:grid-cols-3 border-0 border-none bg-transparent shadow-none "
             >
-              {/* Feature 1 */}
-              <motion.div
-                variants={fadeIn}
-                className="bg-card rounded-xl p-5 sm:p-6 border shadow-sm hover:shadow-md transition-all"
-              >
-                <div className="h-11 w-11 sm:h-12 sm:w-12 bg-primary/10 rounded-full flex items-center justify-center mb-3 sm:mb-4">
-                  <Users className="h-6 w-6 text-primary" />
-                </div>
-                <h3 className="text-lg sm:text-xl font-semibold mb-2">Gestion des clients</h3>
-                <p className="text-sm sm:text-base text-muted-foreground mb-4">
-                  Enregistrez rapidement vos clients, suivez leur statut en temps réel et gérez efficacement chaque interaction.
-                </p>
-                <ul className="space-y-2">
-                  {[
-                    'Ajout rapide avec contact',
-                    'Suivi en temps réel des statuts',
-                    'Numérotation automatique',
-                  ].map((item) => (
-                    <li key={item} className="flex items-start gap-2">
-                      <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
-                      <span className="text-xs sm:text-sm">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-              </motion.div>
+              {features.map(({ icon, title, desc }, i) => (
+                <motion.div
+                  key={title}
+                  variants={fadeIn}
+                  className="flex items-start gap-4  !border-0 !border-none !ring-0 !shadow-none"
+                >
+                  {/* Icon */}
+                  <div className="flex-shrink-0 bg-primary/10 p-2 rounded-full">
+                    {icon}
+                  </div>
 
-              {/* TODO: replicate similar responsive tweaks for the rest of the features (2‑6) */}
+                  {/* Text */}
+                  <div>
+                    <h3 className="font-semibold text-sm sm:text-base mb-1">{title}</h3>
+                    <p className="text-xs sm:text-sm text-muted-foreground">{desc}</p>
+                  </div>
+                </motion.div>
+              ))}
             </motion.div>
           </div>
         </section>
+
+
 
         {/* Pricing Section */}
-        <section id="pricing" className="py-12 sm:py-16 md:py-24 px-4 sm:px-6">
-          <div className="container mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-              className="text-center mb-12 sm:mb-16"
-            >
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
-                Des <span className="nofile-text-gradient">tarifs</span> adaptés à vos besoins
-              </h2>
-              <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
-                Choisissez l'offre qui correspond le mieux à votre activité et évoluez avec nous.
-              </p>
-            </motion.div>
+        <PricingSection prices={prices} />
 
-            <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={staggerContainer}
-              className="grid gap-6 sm:gap-8 md:grid-cols-3"
-            >
-              {/* Plan Gratuit */}
-              <motion.div
-                variants={fadeIn}
-                className="bg-card rounded-xl overflow-hidden border shadow-sm hover:shadow-md transition-all"
-              >
-                <div className="p-5 sm:p-6 border-b">
-                  <h3 className="text-lg sm:text-xl font-semibold mb-2">Gratuit</h3>
-                  <div className="flex items-end gap-1 mb-4">
-                    <span className="text-3xl sm:text-4xl font-bold">0€</span>
-                    <span className="text-xs sm:text-sm text-muted-foreground mb-1">/mois</span>
-                  </div>
-                  <p className="text-xs sm:text-sm text-muted-foreground">
-                    Parfait pour démarrer et découvrir NoFile
-                  </p>
-                </div>
-                <div className="p-5 sm:p-6">
-                  <ul className="space-y-3 mb-6">
-                    {[
-                      "1 file d'attente active",
-                      '20 clients par jour',
-                      'Fonctionnalités de base',
-                      '1 utilisateur',
-                    ].map((feat) => (
-                      <li key={feat} className="flex items-start gap-2">
-                        <Check className="h-4 w-4 text-green-500 flex-shrink-0 mt-0.5" />
-                        <span className="text-xs sm:text-sm">{feat}</span>
-                      </li>
-                    ))}
-                  </ul>
-                  <Link href="/auth/register">
-                    <Button className="w-full" variant="outline" size="sm">
-                      Commencer gratuitement
-                    </Button>
-                  </Link>
-                </div>
-              </motion.div>
-
-              {/* TODO: replicate responsive tweaks for Basique & Premium plans */}
-            </motion.div>
-          </div>
-        </section>
 
         {/* Testimonials Section */}
-        <section className="py-12 sm:py-16 md:py-24 px-4 sm:px-6 bg-accent/5">
-          <div className="container mx-auto">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-              className="text-center mb-12 sm:mb-16"
-            >
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-4">
-                Ce que nos <span className="nofile-text-gradient">clients</span> disent
-              </h2>
-              <p className="text-lg sm:text-xl text-muted-foreground max-w-2xl mx-auto">
-                Découvrez comment NoFile a transformé la gestion des files d'attente pour nos clients.
-              </p>
-            </motion.div>
-
-            <motion.div
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              variants={staggerContainer}
-              className="grid gap-6 sm:gap-8 md:grid-cols-3"
-            >
-              {/* Testimonial 1 (responsive tweaks applied) */}
-              <motion.div
-                variants={fadeIn}
-                className="bg-card rounded-xl p-5 sm:p-6 border shadow-sm"
-              >
-                <div className="flex items-center mb-4">
-                  <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-primary/20 flex items-center justify-center text-base sm:text-xl font-bold text-primary mr-3 sm:mr-4">
-                    S
-                  </div>
-                  <div>
-                    <h4 className="text-sm sm:text-base font-semibold">Sophie Martin</h4>
-                    <p className="text-[11px] sm:text-sm text-muted-foreground">Cabinet Médical</p>
-                  </div>
-                </div>
-                <p className="text-xs sm:text-sm text-muted-foreground mb-4">
-                  "Avant NoFile, nos patients attendaient parfois des heures dans notre salle d'attente. Maintenant, ils reçoivent un SMS quand c'est bientôt leur tour. La satisfaction a augmenté de 80% !"
-                </p>
-                <div className="flex">
-                  {[1, 2, 3, 4, 5].map((star) => (
-                    <svg
-                      key={star}
-                      className="h-4 w-4 sm:h-5 sm:w-5 text-yellow-500"
-                      viewBox="0 0 20 20"
-                      fill="currentColor"
-                    >
-                      <path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" />
-                    </svg>
-                  ))}
-                </div>
-              </motion.div>
-
-              {/* TODO: replicate responsive tweaks for Testimonials 2 & 3 */}
-            </motion.div>
-          </div>
-        </section>
+        <TestimonialsSection />
 
         {/* Call to Action */}
         <section className="py-12 sm:py-16 md:py-24 px-4 sm:px-6 bg-gradient-to-r from-primary/10 to-accent/10">
@@ -452,10 +367,10 @@ export default function HomePage() {
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
             >
-              <h2 className="text-2xl sm:text-3xl md:text-4xl font-bold mb-6">
+              <h2 className="text-xl sm:text-2xl md:text-3xl font-bold mb-6">
                 Prêt à <span className="nofile-text-gradient">transformer</span> votre expérience client ?
               </h2>
-              <p className="text-lg sm:text-xl text-muted-foreground mb-8 max-w-2xl mx-auto">
+              <p className="text-xs sm:text-sm text-muted-foreground mb-8 max-w-2xl mx-auto">
                 Commencez gratuitement dès aujourd'hui et découvrez comment NoFile peut améliorer votre efficacité et la satisfaction de vos clients.
               </p>
               <Link href="/auth/register">
@@ -468,87 +383,111 @@ export default function HomePage() {
         </section>
 
         {/* Footer */}
-        <footer className="py-10 sm:py-12 px-4 sm:px-6 bg-background border-t">
+        <footer className="bg-background border-t pt-12 pb-10 px-4 sm:px-6">
           <div className="container mx-auto">
-            <div className="grid gap-6 sm:gap-8 md:grid-cols-4 mb-8">
-              <div>
-                <Logo showText className="mb-4" />
-                <p className="text-xs sm:text-sm text-muted-foreground">
-                  NoFile v3 est la solution moderne de gestion des files d'attente pour toutes les entreprises soucieuses d'offrir une expérience client optimale.
+            <div className="grid gap-10 sm:gap-12 md:grid-cols-5">
+              {/* Brand */}
+              <div className="md:col-span-2">
+                <LogoSmall showText className="mb-4" />
+                <p className="text-xs sm:text-sm text-muted-foreground max-w-xs">
+                  NoFile est la solution moderne pour gérer vos files d’attente et offrir une
+                  expérience client optimale.
                 </p>
+
+                {/* Socials (optionnel, à retirer si inutile) */}
+                <div className="flex gap-3 mt-6">
+
+                  <a href="#"
+                    aria-label="Twitter"
+                    className="p-2 rounded-full bg-muted/20 hover:bg-muted/30 transition-colors"
+                  >
+                    <Twitter className="h-4 w-4" />
+                  </a>
+
+                  <a href="#"
+                    aria-label="LinkedIn"
+                    className="p-2 rounded-full bg-muted/20 hover:bg-muted/30 transition-colors"
+                  >
+                    <Linkedin className="h-4 w-4" />
+                  </a>
+
+                  <a href="#"
+                    aria-label="GitHub"
+                    className="p-2 rounded-full bg-muted/20 hover:bg-muted/30 transition-colors"
+                  >
+                    <Github className="h-4 w-4" />
+                  </a>
+                </div>
               </div>
 
-              <div className="space-y-4">
-                <h4 className="font-semibold text-sm sm:text-base">Produit</h4>
-                <ul className="space-y-2">
-                  {[
+              {/* Links */}
+              {[
+                {
+                  title: 'Produit',
+                  links: [
                     ['#features', 'Fonctionnalités'],
                     ['#pricing', 'Tarifs'],
                     ['#', 'FAQ'],
                     ['#', "Guide d'utilisation"],
-                  ].map(([href, label]) => (
-                    <li key={label}>
-                      <a
-                        href={href}
-                        className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="font-semibold text-sm sm:text-base">Entreprise</h4>
-                <ul className="space-y-2">
-                  {[
+                  ],
+                },
+                {
+                  title: 'Entreprise',
+                  links: [
                     ['#', 'À propos'],
                     ['#', 'Nous contacter'],
                     ['#', 'Carrières'],
                     ['#', 'Blog'],
-                  ].map(([href, label]) => (
-                    <li key={label}>
-                      <a
-                        href={href}
-                        className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
-
-              <div className="space-y-4">
-                <h4 className="font-semibold text-sm sm:text-base">Légal</h4>
-                <ul className="space-y-2">
-                  {[
+                  ],
+                },
+                {
+                  title: 'Légal',
+                  links: [
                     ['#', "Conditions d'utilisation"],
                     ['#', 'Politique de confidentialité'],
                     ['#', 'Mentions légales'],
-                  ].map(([href, label]) => (
-                    <li key={label}>
-                      <a
-                        href={href}
-                        className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
-                      >
-                        {label}
-                      </a>
-                    </li>
-                  ))}
-                </ul>
-              </div>
+                  ],
+                },
+              ].map(({ title, links }) => (
+                <div key={title} className="space-y-4">
+                  <h4 className="font-semibold text-sm sm:text-base">{title}</h4>
+                  <ul className="space-y-2">
+                    {links.map(([href, label]) => (
+                      <li key={label}>
+                        <a
+                          href={href}
+                          className="text-xs sm:text-sm text-muted-foreground hover:text-foreground transition-colors"
+                        >
+                          {label}
+                        </a>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              ))}
             </div>
 
-            <div className="pt-8 border-t text-center">
-              <p className="text-xs sm:text-sm text-muted-foreground">
-                © {new Date().getFullYear()} NoFile v3. Tous droits réservés.
-              </p>
+            {/* Bottom bar */}
+            <div className="mt-12 pt-6 border-t border-border/40 flex flex-col sm:flex-row gap-4 items-center justify-between text-xs sm:text-sm text-muted-foreground">
+              <div>
+                <p>© {new Date().getFullYear()} NoFile. Tous droits réservés.</p>
+              </div>
+
+              {/* Sélecteur de langue facultatif */}
+              <div className="flex gap-3">
+                <a href="#" className="hover:text-foreground transition-colors">
+                  FR
+                </a>
+                <span className="opacity-40">|</span>
+                <a href="#" className="hover:text-foreground transition-colors">
+                  EN
+                </a>
+              </div>
             </div>
-          </div>
-        </footer>
-      </div>
-    </ThemeProvider>
+          </div >
+        </footer >
+
+      </div >
+    </ThemeProvider >
   );
 }

@@ -301,3 +301,12 @@
   transform: translateY(-20px);
   transition: opacity 0.3s, transform 0.3s;
 }
+
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+.no-scrollbar {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
